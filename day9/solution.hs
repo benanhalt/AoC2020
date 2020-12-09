@@ -7,14 +7,15 @@ main :: IO ()
 main = do
   input <- filter (not . null) <$> splitOn "\n" <$> readFile("input.txt")
   let numbers :: [Int] = read <$> input
+
   putStrLn "Part 1:"
-  let invalid = head $ search numbers
+  let invalid = findInvalid numbers
   putStrLn $ show $ invalid
 
   putStrLn "Part 2:"
   let set = findSet numbers invalid
-  let min' = foldl min (head set) $ tail set
-  let max' = foldl max (head set) $ tail set
+  let min' = minimum set
+  let max' = maximum set
   putStrLn $ show $ (min' + max')
 
 
@@ -23,14 +24,14 @@ findSet numbers n = head $ do
   start <- [0 .. length numbers - 2]
   size <- [2 .. length numbers - start]
   let set = take size $ drop start numbers
-  guard $ foldl (+) 0 set == n
+  guard $ sum set == n
   pure $ set
 
-search :: [Int] -> [Int]
-search numbers = do
-  i <- [25..length numbers]
-  let preamble = take 25 $ drop (i - 25) numbers
-  let n = head $ drop i numbers
+findInvalid :: [Int] -> Int
+findInvalid numbers = head $  do
+  i <- [0..length numbers]
+  let preamble = take 25 $ drop i numbers
+  let n = head $ drop (i + 25) numbers
   guard $ not $ isSumOfPair preamble n
   pure $ n
 
