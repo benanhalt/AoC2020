@@ -1,11 +1,11 @@
 {-# LANGUAGE NamedFieldPuns, ScopedTypeVariables #-}
 
-import Data.List.Split (splitOn)
+import Data.List (tails, scanl')
 import Control.Monad (guard)
 
 main :: IO ()
 main = do
-  input <- filter (not . null) <$> splitOn "\n" <$> readFile("input.txt")
+  input <- words <$> readFile("input.txt")
   let numbers :: [Int] = read <$> input
 
   putStrLn "Part 1:"
@@ -13,31 +13,32 @@ main = do
   putStrLn $ show $ invalid
 
   putStrLn "Part 2:"
-  let set = findSet numbers invalid
-  let min' = minimum set
-  let max' = maximum set
-  putStrLn $ show $ (min' + max')
+  putStrLn $ show $ findWeakness numbers invalid
 
 
-findSet :: [Int] -> Int -> [Int]
-findSet numbers n = head $ do
-  start <- [0 .. length numbers - 2]
-  size <- [2 .. length numbers - start]
-  let set = take size $ drop start numbers
-  guard $ sum set == n
-  pure $ set
+findWeakness :: [Int] -> Int -> Int
+findWeakness numbers n = head $ do
+  t <- tails numbers
+  first <- take 1 t
+  let rest = tail t
+  let sums = scanl' (\(sum', min', max') x -> (sum' + x, min min' x, max max' x)) (first, first, first) $ rest
+  let nonDegenerate = drop 1 sums -- Throw away the degenerate case where the sum is a single term.
+  let sumsNotLessThanN = dropWhile (\(sum', _, _) -> sum' < n) nonDegenerate
+  (sum', min', max') <- take 1 sumsNotLessThanN -- Only need to check the first sum >= n since they are monotonically increasing.
+  guard $ sum' == n
+  pure $ min' + max'
 
 findInvalid :: [Int] -> Int
-findInvalid numbers = head $  do
-  i <- [0..length numbers]
-  let preamble = take 25 $ drop i numbers
-  let n = head $ drop (i + 25) numbers
-  guard $ not $ isSumOfPair preamble n
+findInvalid numbers = head $ do
+  t <- tails numbers
+  let (preamble, rest) = splitAt 25 t
+  n <- take 1 rest
+  guard $ not $ any (== n) $ allSums preamble
   pure $ n
 
-isSumOfPair :: [Int] -> Int -> Bool
-isSumOfPair numbers n = any (== n) $ do
-  a <- numbers
-  b <- numbers
-  guard $ a /= b
+allSums :: [Int] -> [Int]
+allSums numbers = do
+  t <- tails numbers
+  a <- take 1 t
+  b <- tail t
   pure $ a + b
