@@ -17,17 +17,19 @@ main = do
   putStrLn $ show $ ones * threes
 
   putStrLn "Part 2:"
-  putStrLn $ show sorted
-  putStrLn $ show diffs
-  putStrLn $ show $ chain adapters 0 0
+  putStrLn $ show $ count adapters 0
 
 canConnect :: [Int] -> Int -> [Int]
 canConnect available prev = filter (\a -> (a - prev) `elem` [1, 2, 3]) available
 
-chain :: [Int] -> Int -> Int -> Int
-chain available generated current =
-  if null $ canConnect available current
-  then generated + 1
-  else sum $ do
-    next <- canConnect available current
-    pure $ chain (delete next available) generated next
+count :: [Int] -> Int -> Int
+count available prev =
+  let
+    results :: [Int] = count' <$> [0..]
+    goal = maximum available
+    count' :: Int -> Int
+    count' prev =
+      if prev == goal then 1 else
+        sum $ (\a -> results !! a) <$> canConnect available prev
+  in
+    results !! prev
