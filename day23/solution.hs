@@ -1,59 +1,62 @@
 {-# LANGUAGE NamedFieldPuns, ScopedTypeVariables #-}
 
 import Data.Char (isDigit, digitToInt)
-import Data.List (tails, foldl', break, sort, isPrefixOf, subsequences)
+import Data.List (tails, foldl', break, sort, isPrefixOf, cycle, unfoldr)
 import Data.List.Split (splitOn)
-import Data.Bits ((.|.), (.&.), complement)
 import Control.Monad (guard)
 import Debug.Trace (traceShowId, traceShow)
-import Data.Function (fix)
-import Numeric (readInt, showIntAtBase)
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
-type Grid = Map (Int, Int) Char
+data CupGame = CupGame
+  { cupOrder :: Map Int Int -- Vector would probably be much faster!
+  , currentCup :: Int
+  , maxCup :: Int
+  } deriving (Show)
 
 main :: IO ()
 main = do
-  let input = "167248359"
+  let input = digitToInt <$> "167248359"
   putStrLn "Part 1:"
-  let result = iterate move (digitToInt <$> input) !! 100
-  let (pre, post) = break (== 1) result
-  putStrLn $ concat $ show <$> post ++ pre
+  let result = solve input 100
+  let (pre, post) = break (== 1) $ showCups result
+  putStrLn $ concat $ show <$> (drop 1 $ post ++ pre)
 
   putStrLn "Part 2:"
-  let cups = digitToInt <$> input
-  let maxCup = maximum cups
-  let allCups = take 1000000 $ cups ++ [maxCup + 1 ..]
-  let result2 = iterate move allCups !! 100
-  let (pre2, post2) = break (== 1) result2
-  print $ take 2 $ drop 1 post2
+  let maxInput = maximum input
+  let input2 = input ++ [maxInput + 1 .. 1000000]
+  let result = solve input2 10000000
+  print $ product $ take 2 $ cupsInOrder $ result {currentCup = 1}
 
-  
-move :: [Int] -> [Int]
-move cups =
+solve :: [Int] -> Int -> CupGame
+solve input iterations =
   let
-    current = head cups
-    removed = drop 1 $ take 4 cups
-    remaining = current : drop 4 cups
-    lessThanCur = filter (< current) $ sort $ remaining
-    dest = if null lessThanCur then maximum remaining else last lessThanCur
-    (pre, post) = break (== dest) remaining
-    placed = pre ++ [head post] ++ removed ++ tail post
+    cups = Map.fromList $ zip input (drop 1 $ cycle input)
+    game = CupGame cups 1 (maximum input)
   in
-    (drop 1 placed) ++ [head placed]
+    iterate move game !! iterations
 
--- The crab picks up the three cups that are immediately clockwise of
--- the current cup. They are removed from the circle; cup spacing is
--- adjusted as necessary to maintain the circle.  The crab selects a
--- destination cup: the cup with a label equal to the current cup's
--- label minus one. If this would select one of the cups that was just
--- picked up, the crab will keep subtracting one until it finds a cup
--- that wasn't just picked up. If at any point in this process the
--- value goes below the lowest value on any cup's label, it wraps
--- around to the highest value on any cup's label instead.  The crab
--- places the cups it just picked up so that they are immediately
--- clockwise of the destination cup. They keep the same order as when
--- they were picked up.  The crab selects a new current cup: the cup
--- which is immediately clockwise of the current cup
+
+cupsInOrder :: CupGame -> [Int]
+cupsInOrder CupGame {cupOrder, currentCup, maxCup} = unfoldr (\c -> (\n -> (n,n)) <$> Map.lookup c cupOrder) currentCup
+
+showCups :: CupGame -> [Int]
+showCups game@CupGame {currentCup, maxCup} = take maxCup $ cupsInOrder game
+
+countDown :: CupGame -> [Int]
+countDown CupGame {currentCup, maxCup} = take maxCup $ (\i -> 1 + i `mod` maxCup) <$> [currentCup - 2, currentCup - 3 ..]
+
+move :: CupGame -> CupGame
+move game@CupGame {cupOrder, currentCup, maxCup} =
+  let
+    removed = take 3 $ cupsInOrder game
+    Just removedNext = Map.lookup (last removed) cupOrder
+    dest = head $ dropWhile (`elem` removed) $ countDown game
+    Just destNext = Map.lookup dest cupOrder
+    newOrder = Map.insert dest (head removed) $ Map.insert (last removed) destNext $ Map.insert currentCup removedNext cupOrder
+    Just nextCup = Map.lookup currentCup newOrder
+  in
+    game {cupOrder = newOrder, currentCup = nextCup}
+
+
